@@ -14,48 +14,59 @@ def check_for_job():
     try:
         print("Launching browser via Playwright...")
         with sync_playwright() as p:
-            # הפעלת Chromium במצב ללא גרפיקה (headless)
-            browser = p.chromium.launch(headless=True)
+            browser = p.chromium.launch(headless=False)
             page = browser.new_page()
 
-            # ניווט ל-URL והגדלת ה-Timeout ל-60 שניות (אתרים אלו איטיים)
             print(f"Navigating to URL: {URL}")
             page.goto(URL, timeout=60000)
 
-            # פתרון לאתרים דינמיים: המתנה שהעמוד ייטען לחלוטין ושלבקשות הרשת יסתיימו
-            print("Waiting for dynamic content to load...")
-            page.wait_for_load_state("networkidle")
-            
-            # המתנה נוספת קצרה של 5 שניות לביטחון
-            time.sleep(5)
+            all_pages_text = ""
+            page_number = 1
 
-            # הוצאת כל הטקסט הקריא מה-Body של העמוד והמרתו לאותיות קטנות
-            print("Extracting page text...")
-            page_text = page.inner_text("body").lower()
-            print(f"Extracted {len(page_text)} characters.")
+            while True:
+                print(f"--- Processing Page {page_number} ---")
+                page.wait_for_load_state("networkidle")
+                time.sleep(3)
 
-            # מילות המפתח לחיפוש (אותיות קטנות בלבד)
-            keywords = ["software developer student", "intern"]
+                current_page_text = page.inner_text("body").lower()
+                all_pages_text += "\n" + current_page_text
+                print(f"Page {page_number}: Extracted {len(current_page_text)} characters.")
+
+                next_button = page.get_by_role("button", name="Next").or_(page.locator('[aria-label*="Next"]')).first
+
+                if next_button.is_visible() and next_button.is_enabled():
+                    print(f"Next button found. Clicking to move to page {page_number + 1}...")
+                    next_button.scroll_into_view_if_needed()
+                    next_button.click()
+                    page_number += 1
+                    time.sleep(3)
+                else:
+                    print("No more pages found. Exiting pagination loop.")
+                    break
+
+            with open("scraped_content.txt", "w", encoding="utf-8") as f:
+                f.write(all_pages_text)
+            print(f"Saved total extracted text from {page_number} pages to scraped_content.txt")
+
+            # --- מילות המפתח אופסו למטרה המקורית ---
+            keywords = ["student", "intern", "internship"]
             
-            # בדיקה האם אחת מהמילים קיימת בטקסט שחולץ
-            found_keywords = [kw for kw in keywords if kw in page_text]
+            found_keywords = [kw for kw in keywords if kw in all_pages_text]
             
             if found_keywords:
                 print(f"Match found! Keywords: {found_keywords}. Sending email...")
                 send_email(found_keywords)
             else:
-                print("No matching roles found in the dynamic content.")
+                print("No matching roles found. Safe to ignore.")
 
             browser.close()
             
     except Exception as e:
         print(f"An error occurred during scraping: {e}")
 
-# פונקציית שליחת המייל נשארת כמעט אותו דבר
 def send_email(found_keywords):
     msg = EmailMessage()
-    # הוספתי כותרת קצת יותר ברורה למקרה של מיקרוסופט
-    msg.set_content(f"A relevant role was detected at Microsoft Microsoft Careers:\n\nLink: {URL}\n\nKeywords matched: {', '.join(found_keywords)}")
+    msg.set_content(f"A relevant student/intern role was detected at Microsoft Careers:\n\nLink: {URL}\n\nKeywords matched: {', '.join(found_keywords)}")
     
     msg['Subject'] = 'Job Alert: Student/Intern position found at Microsoft Israel!'
     msg['From'] = EMAIL_SENDER
