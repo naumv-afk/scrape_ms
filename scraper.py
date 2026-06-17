@@ -4,7 +4,7 @@ import smtplib
 from email.message import EmailMessage
 import time
 
-# משיכת משתני הסביבה (נשאר ללא שינוי)
+# משיכת משתני הסביבה
 URL = os.environ.get("JOB_URL")
 EMAIL_SENDER = os.environ.get("EMAIL_SENDER")
 EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD")
@@ -14,7 +14,7 @@ def check_for_job():
     try:
         print("Launching browser via Playwright...")
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=False)
+            browser = p.chromium.launch(headless=True)
             page = browser.new_page()
 
             print(f"Navigating to URL: {URL}")
@@ -44,11 +44,7 @@ def check_for_job():
                     print("No more pages found. Exiting pagination loop.")
                     break
 
-            with open("scraped_content.txt", "w", encoding="utf-8") as f:
-                f.write(all_pages_text)
-            print(f"Saved total extracted text from {page_number} pages to scraped_content.txt")
-
-            # --- מילות המפתח אופסו למטרה המקורית ---
+            # מילות המפתח אופסו למטרה המקורית
             keywords = ["student", "intern", "internship"]
             
             found_keywords = [kw for kw in keywords if kw in all_pages_text]
